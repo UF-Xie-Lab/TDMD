@@ -1,0 +1,84 @@
+import os
+import pandas as pd
+import re
+from Bio.Seq import Seq
+
+class Analysis_miRNA:
+    def __init__(self,GENOME='',GFF='',MIRBASE=''):
+        self.miRbase = MIRBASE
+        self.gff = GFF
+        self.genome = GENOME
+
+    def seq_21nt_to_26nt(self, ):
+        dict_miRNA_seq = {} ## miRNA sequence (21nt to 26nt) and name
+        with open(self.genome, 'r+') as f1:
+            dict_genome = {}
+            name1, seq1 = '', ''
+            for line1 in f1:
+                if line1[0] == '>':
+                    if name1 != '':
+                        dict_genome[name1] = seq1
+                        seq1 = ''
+                    name1 = line1.split(' ')[0][1:]
+                else:
+                    seq1 += line1.strip()
+            dict_genome[name1] = seq1
+
+        rex = re.compile('Name=.+;')
+        with open(self.gff, 'r+') as f1:
+            for line1 in f1:
+                try:
+                    line2 = (line1.strip().split('\t'))
+                    if 'miRNA' == line2[2]:
+                        miRNA_name_re = re.search(rex, line1)
+                        miRNA_name = miRNA_name_re.group()[5:-1]
+                        miR_start = int(line2[3])
+                        miR_end = int(line2[4])
+                        chrosome = line2[0]
+                        strand = line2[6]
+                        for length in range(21, 27):
+                            if strand == '+':
+                                seq = Seq(dict_genome[chrosome][miR_start - 1:miR_start + length - 1])
+                                dict_miRNA_seq[str(seq)] = miRNA_name
+                            elif strand == '-':
+                                seq = Seq(dict_genome[chrosome][miR_end - length:miR_end])
+                                dict_miRNA_seq[str(seq.reverse_complement())] = miRNA_name
+                except:
+                    pass
+        return (dict_miRNA_seq)
+
+    def miR_count(self,*fasta):
+        seq_dict = self.seq_21nt_to_26nt()
+        print(fasta)
+        fastq_list = [x.strip('.fa') for x in fasta]
+        for file in fastq_list:
+            dict_miRNA_count = {} ##analyze each miRNA total number
+            with open(f'{file}.fa','r+') as f1:
+                for line1 in f1:
+                    read = line1.strip()  ## read is miRNA sequence
+                    if read in seq_dict:
+                        miRNA_name = seq_dict[read]
+                        dict_miRNA_count[miRNA_name] = dict_miRNA_count.get(miRNA_name,0)
+                        dict_miRNA_count[miRNA_name] += 1
+            with open(f'{file}.count','w+') as f1:
+                f1.write(f'miRNA\t{file}\n')
+                for miRNA_name, miRNA_count in dict_miRNA_count.items():
+                    f1.write(f'{miRNA_name}\t{miRNA_count}\n')
+
+    def miR_isoform_count(self, *fasta):
+        dict_miRNA_18nt = self.seq_18nt()
+        fastq_list = [x.strip('.fa') for x in fasta]
+        for file in fastq_list:
+            dict_miRNA_isoform = {}
+            with open(f'{file}.fa', 'r+') as f1:
+                for line1 in f1:
+                    read = line1.strip()
+                    if read[:18] in dict_miRNA_18nt:
+                        miRNA_name = dict_miRNA_18nt[read[:18]]
+                        if len(read) <= 30:  ## criteria: miRNA isoform is between 18nt to 30nt
+                            dict_miRNA_isoform[miRNA_name] = dict_miRNA_isoform.get(miRNA_name, set())
+                            dict_miRNA_isoform[miRNA_name].add(read)
+            with open(f'{file}_isoform.count', 'w+') as f1:
+                f1.write(f'miRNA\t{file}\n')
+                for miRNA_name, miRNA_count in dict_miRNA_isoform.items():
+                    f1.write(f'{miRNA_name}\t{len(miRNA_count)}\n')
