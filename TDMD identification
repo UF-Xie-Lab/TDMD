@@ -1,0 +1,54 @@
+import os, csv, re
+from Bio.Seq import Seq
+import Bio.Alphabet
+
+list1 = ['$viennad file1', '$viannead file2','$..'] ## all viennad file names
+
+dict_TotalName1 = {} ## Total names of better base pattern
+dict1={}## write total hybs
+for i in list1:
+    with open(i,'r+') as f1:
+        print (i)
+        list1 = []
+        for line1 in f1:
+            line2 = line1.strip().split('_')
+            if len(line2)>= 15: ### Each hybrids in viennad contains 6 lines, usually the first line of each hybrids has 14 '_'
+                miRNA_name1 = line2[4]
+                target_name1 = line2[-4]
+                seriers_number = line2[0] + '_' + line2[1]
+                list1.append(line1.strip())
+            else:
+                list1.append(line1.strip())
+                if len(list1) == 6:
+                    try:
+                        miRNA_end = int(list1[2].split('\t')[3])
+                        miRNA_basepattern = list1[4].split('\t')[0][:miRNA_end]
+                        mRNA_basepattern = list1[4].split('\t')[0][miRNA_end:].strip('.')
+                        miRNA_seq = list1[2].split('\t')[0].strip('-')
+                        pattern = re.compile(''.join(list(map(lambda x:'\\'+str(x), mRNA_basepattern))))
+                        mRNA_start = pattern.search(list1[4].split('\t')[0]).start()
+                        mRNA_end = pattern.search(list1[4].split('\t')[0]).end()
+                        mRNA_seq = list1[3].split('\t')[0][mRNA_start:mRNA_end]
+                        combine_name1 = '{}${}${}${}${}${}'.format(miRNA_name1.lower(),target_name1.upper(),miRNA_basepattern,mRNA_basepattern.strip('.'),miRNA_seq,mRNA_seq)
+                        RC_miRNA_seed = str(Seq(miRNA_seq[1:7]).reverse_complement())
+                        RC_miRNA_tail = str(Seq(miRNA_seq[-13:]).reverse_complement())
+                        if ('.' not in miRNA_basepattern[1:8]) and ('(((((((('  in miRNA_basepattern[-13:]): ## set miRNA pattern
+                            if ('))))))))'  in mRNA_basepattern[:-7]) and (')))))))'  in mRNA_basepattern[-7:]): ## set mRNA pattern
+                                if abs(len(mRNA_basepattern)-len(miRNA_basepattern.strip('.'))) <= 6: ## abs bulge less than 7nt
+                                    if (RC_miRNA_seed) in mRNA_seq[-7:]:
+                                        for length_tail in range(13):
+                                            if len(RC_miRNA_tail[length_tail:length_tail+8])==8:
+                                                if (RC_miRNA_tail[length_tail:length_tail+8]) in mRNA_seq:
+                                                    dict1[combine_name1] = dict1.get(combine_name1,0)
+                                                    dict1[combine_name1] += int(list1[0].split('_')[1])
+                                                    break
+                    except Exception as e:
+                        print (e)
+                        print (list1)
+                    list1 = []
+
+
+f1 = open('$output_file','w+') ##output total hybrids of each dataset
+for x,y in dict1.items():
+    f1.write (x+'\t'+str(y)+'\n')
+f1.close()
