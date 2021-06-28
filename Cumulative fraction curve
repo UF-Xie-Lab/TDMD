@@ -1,0 +1,135 @@
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+from scipy.stats import mannwhitneyu
+
+target.py
+
+class Target_analysis:
+    def __init__(self):
+        pass
+
+    def predicted_targets(self, targets_file):
+        targets_pd = pd.read_table(f'{targets_file}', index_col=[0])
+        target_list = (targets_pd.index)
+        return target_list  ## whole targets from targetScan, ~10% targets are not in Htseq-count output.Thereby,
+        # intersection between mRNA from Htseq-count and targets from TargetScam are necessary
+
+    def output_target_Nontarget_list(self, Ballgown_file, miR_all_target_file, conserved_target_file):  # list file,
+        mRNA_list = set(Ballgown_file.index)
+        all_target_list_intersection = set(self.predicted_targets(miR_all_target_file)) & mRNA_list
+        non_target_list = (mRNA_list - all_target_list_intersection)
+        conserved_target_list_intersection = set(self.predicted_targets(conserved_target_file)) & mRNA_list
+        return all_target_list_intersection, \
+               conserved_target_list_intersection,\
+               non_target_list  # target_list_intersection is tragets name list
+
+    def table_target_Nontraget(self, Ballgown_file2, all_target_list, conserved_target_list, Nontarget_list):
+        all_targets = list(all_target_list)
+        conserved_target = list(conserved_target_list)
+        Nontarget = list(Nontarget_list)
+        all_gene_pd = Ballgown_file2
+        all_gene_length = len(all_gene_pd.index)  ## all gene target matrix, sorted by values
+        print(f'all gene length: {all_gene_length}')
+        try:
+            all_gene_pd['order'] = np.arange(0, 1, 1 / all_gene_length)
+        except:
+            all_gene_pd['order'] = np.arange(0, 1, 1 / all_gene_length)[:-1]
+
+        all_target_pd = (Ballgown_file2.loc[all_targets])  ## all target matrix, sort by value
+        all_target_pd = all_target_pd.sort_values(by=['log2FoldChange'])
+        target_length = len(all_target_pd.index)
+        print(f'all target length: {target_length}')
+        try:
+            all_target_pd['order'] = np.arange(0, 1, 1 / target_length)
+        except:
+            all_target_pd['order'] = np.arange(0, 1, (1 / (target_length)))[:-1]
+
+        conserved_target_pd = (Ballgown_file2.loc[conserved_target])  ## conserved target matrix, sort by value
+        conserved_target_pd = conserved_target_pd.sort_values(by=['log2FoldChange'])
+        conserved_target_length = len(conserved_target_pd.index)
+        print(f'conserved target length: {conserved_target_length}')
+        try:
+            conserved_target_pd['order'] = np.arange(0, 1, 1 / conserved_target_length)
+        except:
+            conserved_target_pd['order'] = np.arange(0, 1, 1 / conserved_target_length)[:-1]
+
+        Nontarget_pd = (Ballgown_file2.loc[Nontarget])  ## Nontarget matrix, sort by value
+        Nontarget_pd = (Nontarget_pd.sort_values(by=['log2FoldChange']))
+        Nontarget_length = len(Nontarget_pd.index)
+        print(f'Nontarget length: {Nontarget_length}')
+        try:
+            Nontarget_pd['order'] = np.arange(0, 1, 1 / Nontarget_length)
+        except:
+            Nontarget_pd['order'] = np.arange(0, 1, (1 / (Nontarget_length)))[:-1]
+        return all_gene_pd, \
+               all_target_pd, \
+               conserved_target_pd, \
+               Nontarget_pd
+
+    def picture(self,
+                Ballgaow_deseq_file='',
+                TargetScan_all_targets='',
+                TargetScan_conserved_targets='',
+                Title='',
+                output_name=''):
+
+        targets_list = self.output_target_Nontarget_list(
+            Ballgown_file=pd.read_csv(Ballgaow_deseq_file, header=0, index_col=[0]),
+            miR_all_target_file=TargetScan_all_targets,
+            conserved_target_file=TargetScan_conserved_targets)
+        targets_de_table = self.table_target_Nontraget(
+            Ballgown_file2=pd.read_csv(Ballgaow_deseq_file, header=0, index_col=[0]),
+            all_target_list=targets_list[0],
+            conserved_target_list=targets_list[1],
+            Nontarget_list=targets_list[2])
+
+        all_targets = targets_de_table[1]
+        conserved_targets = targets_de_table[2]
+        nontargets = targets_de_table[3]
+
+        list_FC_all_targets = (list(all_targets['log2FoldChange']))
+        list_FC_conserved_targets = (list(conserved_targets['log2FoldChange']))
+        list_FC_nontargets = (list(nontargets['log2FoldChange']))
+        U_all_targets, p_all_targets = mannwhitneyu(list_FC_all_targets, list_FC_nontargets, )
+        U_conserved_targets, p_conserved_targets = mannwhitneyu(list_FC_conserved_targets, list_FC_nontargets, )
+        print(f'all targets/ non targets: {p_all_targets}')
+        print(f'conserved targets/ non targets: {p_conserved_targets}')
+        fig, ax = plt.subplots()
+        fig.set_size_inches(10, 10)
+        sns.lineplot(data=all_targets, x='log2FoldChange', y='order', color='orange', linewidth=3,
+                     linestyle='solid',
+                     label=f'all predicted targets ({len(all_targets.index)})')
+        sns.lineplot(data=conserved_targets, x='log2FoldChange', y='order', color='red',
+                     linewidth=3,
+                     linestyle='solid',
+                     label=f'conserved predicted targets ({len(conserved_targets.index)})')
+        sns.lineplot(data=nontargets, x='log2FoldChange', y='order', color='black', linewidth=3,
+                     linestyle='solid',
+                     label=f'Non target ({len(nontargets.index)})')
+        ax.set_xlim(-1.5, 1.5)
+        ax.set_ylim(0, 1.1)
+        ax.set_xlabel('Fold change (log2)', fontsize=15)
+        ax.set_ylabel('Cumulative fraction', fontsize=15)
+        ax.set_title(f'{Title}', fontsize=15)
+        plt.savefig(f'/Users/rui/Dropbox/Desk_Drive/Exp74/New_file_after_20210422/Balgown_Lu/20210623-{output_name}.svg')
+        
+        
+        
+main.py
+        
+from target import Target_analysis
+# Target_analysis().picture(
+#     Ballgaow_deseq_file='/Users/rui/Dropbox/Desk_Drive/Exp74/New_file_after_20210422/Balgown_Lu/BCL2L11_results_bm5.csv',
+#     TargetScan_all_targets='TargetScan7.2__miR-221-3p_222-3p.predicted_all_targets.txt',
+#     TargetScan_conserved_targets='TargetScan7.2__miR-221-3p_222-3p.predicted_conserved_targets.txt',
+#     Title='BCL2L11/Control, rowVars(texpr(bg)) > 5',
+#     output_name='Bcl2l11')
+
+Target_analysis().picture(
+    Ballgaow_deseq_file='/Users/rui/Dropbox/Desk_Drive/Exp74/New_file_after_20210422/Balgown_Lu/Trim9_results_bm5.csv',
+    TargetScan_all_targets='TargetScan7.2__miR-218-5p.predicted_all_targets.txt',
+    TargetScan_conserved_targets='TargetScan7.2__miR-218-5p.predicted_conserved_targets.txt',
+    Title='Trim9/Control, rowVars(texpr(bg)) > 5',
+    output_name='Trim9')
