@@ -1,0 +1,52 @@
+import os, pandas as pd, numpy as np
+os.chdir('/Users/rui/Dropbox/Lu_TDMD_paper/2020-04_Fig1/2020-04-10_final_TDMD_version/')
+
+######screen by RPM
+f1 = pd.read_csv('$input_TDMD_all_datasets.csv',index_col=[0,1,2,3,4,5,6,7,8,])
+f1 = f1[f1['Mean_RPM']>10]
+f1.to_csv('output_TDMD_RPM_20.csv')
+
+######screen by Conservation Score
+f1 = pd.read_csv('$input_TDMD_all_datasets.csv',index_col=[0,1,2,3,4,5,6,7,8,])
+f1 = f1[f1['phyloP100way_human']>2]
+f1.to_csv('output_TDMD_CS_2.csv')
+
+######screen by Extension at least one A/U
+f1 = pd.read_csv('$input_TDMD_all_datasets.csv',index_col=[0,1,2,3,4,5,6,7,8,])
+f1 = f1[f1['Mean_Ex2AU_ratio']>1]
+f1.to_csv('output_TDMD_Ex2AU_1.csv')
+
+######screen by  samples>=3 or species >=2
+f1 = pd.read_csv('$input_TDMD_all_datasets.csv',index_col=[0,1,2,3,4,5,6,7,8,])
+f1 = f1[(f1['Samples']>=3) | (f1['Species']>=2)] 
+f1.to_csv('output_TDMD_samples_3_species_2.csv')
+
+######screen by Basepattern
+f2 = open('output_TDMD_Base_Pattern_Good_10.csv','w+')
+with open('$input_TDMD_all_datasets.csv') as f1:
+    context = f1.readlines()
+    for num1,value1 in enumerate(context):
+        pattern_miRNA = value1.split(',')[5]
+        pattern_mRNA = value1.split(',')[6]
+        if num1 == 0:
+            f2.write(value1)
+        else:
+            if (('((((((((((' in (pattern_miRNA[9:])) and ('))))))))))' in pattern_mRNA[:-8])) or ('((((((((' in (pattern_miRNA[-9:])):
+                if ('......' not in pattern_miRNA) and ('......' not in pattern_mRNA):
+                    f2.write(value1)
+f2.close()
+
+######screen by Basepattern
+f2 = open('output_TDMD_Base_Pattern_Good_8.csv','w+')
+with open('$input_TDMD_all_datasets.csv') as f1:
+    context = f1.readlines()
+    for num1,value1 in enumerate(context):
+        pattern_miRNA = value1.split(',')[5]
+        pattern_mRNA = value1.split(',')[6]
+        if num1 == 0:
+            f2.write(value1)
+        else:
+            if  ('((((((((' in (pattern_miRNA[-9:])):
+                if ('......' not in pattern_miRNA) and ('......' not in pattern_mRNA):
+                    f2.write(value1)
+f2.close()
